@@ -6,6 +6,13 @@ let sound;            // Sound object
 let fft;              // Audio spectrum analyzer
 let appleFallen = false; // Flag to track if apples have fallen to ground
 
+// Game variables
+let container = {x: 0, y: 0, width: 120, height: 60}; // Container object
+let gameStarted = false; // Flag to track if game has started
+let dropQueue = []; // Queue of apples to drop
+let dropTimer = 0; // Timer for dropping apples sequentially
+let dropInterval = 60; // Frames between each apple drop (1 second at 60fps)
+
 function preload() {
   // Preload audio file
   sound = loadSound("/red_velvet_dumb_dumb.mp3");
@@ -45,6 +52,10 @@ function setup() {
 
   // Initialize audio FFT analyzer
   fft = new p5.FFT();
+  
+  // Initialize container position
+  container.x = width / 2 - container.width / 2;
+  container.y = height / 2 + 200 - container.height;
 }
 
 function styleButton(btn) {
@@ -95,9 +106,12 @@ function drawBackground() {
 function drawApple() {
   // Redraw background
   drawBackground();
-  // Clear existing apple array and reset fallen state
+  // Clear existing apple array and reset game state
   allCircles = [];
   appleFallen = false;
+  gameStarted = false;
+  dropQueue = [];
+  dropTimer = 0;
 
   push();
   // Translate origin to lower center of canvas
@@ -182,7 +196,6 @@ function drawCirclesOnLine(x1, y1, x2, y2, allCircles) {
           }
         }
       }
-      // update overlapping
     }
 
     // If not overlapping, create new apple
@@ -202,7 +215,11 @@ function drawCirclesOnLine(x1, y1, x2, y2, allCircles) {
         angle: angle, 
         color1, 
         color2,
-        originalY: cy    // Store original position for reset
+        originalY: cy,    // Store original position for reset
+        isFalling: false, // Is this apple currently falling
+        hasLanded: false, // Has this apple landed on ground
+        inContainer: false, // Has this apple been caught in container
+        visible: true     // Is this apple visible (for removal animation)
       });
     }
 
@@ -265,12 +282,16 @@ function keyPressed() {
 
 // Drop all apples to ground instantly
 function dropApples() {
-  if (!appleFallen && allCircles.length > 0) {
-    appleFallen = true;
-    for (let apple of allCircles) {
-      // Move apple to ground level, keeping horizontal position
-      apple.y = -apple.r; // Position on ground (accounting for radius)
+  if (!gameStarted && allCircles.length > 0) {
+    gameStarted = true;
+    // Create randomized drop queue
+    dropQueue = [...Array(allCircles.length).keys()]; // [0, 1, 2, 3, ...]
+    // Shuffle the array randomly
+    for (let i = dropQueue.length - 1; i > 0; i--) {
+      let j = Math.floor(Math.random() * (i + 1));
+      [dropQueue[i], dropQueue[j]] = [dropQueue[j], dropQueue[i]];
     }
+    dropTimer = 0;
   }
 }
 
@@ -278,6 +299,24 @@ function draw() {
   // Redraw background
   drawBackground();
   
+  // Create container position and game logic
+  Container();
+  Game();
+  
+  // Create falling animation if apples are falling
+  if (appleFallen) {
+    let allLanded = true;
+    for (let apple of allCircles) {
+      if (apple.y < -apple.r) { // If apple hasn't reached ground
+        apple.y += 3; // Move down by 3 pixels per frame
+        allLanded = false;
+      }
+    }
+    if (allLanded) {
+      appleFallen = false; // Stop animation when all apples have landed
+    }
+  }
+
   // Get low frequency audio energy for color effect
   let spectrum = fft.analyze(); // Analyze audio spectrum
   let lowEnergy = fft.getEnergy(20, 200); // Get 20–200Hz energy
@@ -287,23 +326,25 @@ function draw() {
   translate(width / 2, height / 2 + 200);
   noStroke();
   
-  // Draw all apples with music-reactive color
+  // Draw all visible apples with music-reactive color
   for (let c of allCircles) {
-    // Create color interpolation
-    let from1 = color(...c.color1);
-    let to1 = color(...c.color2);
-    let lerped1 = lerpColor(from1, to1, t); // Interpolate based on energy
+    if (c.visible) { // Only draw visible apples
+      // Create color interpolation
+      let from1 = color(...c.color1);
+      let to1 = color(...c.color2);
+      let lerped1 = lerpColor(from1, to1, t); // Interpolate based on energy
 
-    let from2 = color(...c.color2);
-    let to2 = color(...c.color1);
-    let lerped2 = lerpColor(from2, to2, t);
+      let from2 = color(...c.color2);
+      let to2 = color(...c.color1);
+      let lerped2 = lerpColor(from2, to2, t);
 
-    // Draw two half-arcs for each apple
-    fill(lerped1);
-    arc(c.x, c.y, c.r * 2, c.r * 2, c.angle, c.angle + PI); // first half
+      // Draw two half-arcs for each apple
+      fill(lerped1);
+      arc(c.x, c.y, c.r * 2, c.r * 2, c.angle, c.angle + PI); // first half
 
-    fill(lerped2);
-    arc(c.x, c.y, c.r * 2, c.r * 2, c.angle + PI, c.angle + TWO_PI); // second half
+      fill(lerped2);
+      arc(c.x, c.y, c.r * 2, c.r * 2, c.angle + PI, c.angle + TWO_PI); // second half
+    }
   }
 
   // Draw tree branch lines
@@ -312,5 +353,87 @@ function draw() {
   for (let lineSegment of lines) {
     line(lineSegment.x1, lineSegment.y1, lineSegment.x2, lineSegment.y2);
   }
+  pop();
+  
+  // Draw container only when apples exist
+  if (allCircles.length > 0) {
+    drawContainer();
+  }
+  
+  // Game instructions (Learn from: https://p5js.org/reference/p5/textAlign/)
+  if (allCircles.length > 0 && !gameStarted) {
+    fill(255, 255, 255, 200);
+    rect(10, 10, 380, 50, 10);
+    fill(0);
+    textAlign(CENTER, CENTER);
+    textSize(14);
+    text('Press SPACEBAR to start the Apple Catching Game!', 200, 35);
+  }
+}
+
+// Check if apple is in container
+function checkAppleCaught(apple, container) {
+  let withinX = apple.x > container.x && apple.x < container.x + container.width;
+  let withinY = apple.y + apple.r > container.y && apple.y - apple.r < container.y + container.height;
+  return withinX && withinY;
+}
+
+// Let container position based on mouse
+function Container() {
+  // Keep container within canvas bounds
+  container.x = constrain(mouseX - container.width / 2, 37, 37 + 525 - container.width);
+}
+
+// Let game logic for dropping apples and collision detection
+function Game() {
+  if (!gameStarted) return;
+  
+  // Drop next apple in queue
+  if (dropQueue.length > 0) {
+    dropTimer++;
+    if (dropTimer >= dropInterval) {
+      let nextAppleIndex = dropQueue.shift();
+      allCircles[nextAppleIndex].isFalling = true;
+      dropTimer = 0;
+    }
+  }
+  
+  // Falling apples
+  for (let apple of allCircles) {
+    if (apple.isFalling && !apple.hasLanded && apple.visible) {
+      apple.y += 4; // Fall speed
+      
+      // Check collision with container using the new method
+      if (checkAppleCaught(apple, container)) {
+        // Apple caught in container
+        apple.inContainer = true;
+        apple.visible = false;
+        apple.isFalling = false;
+      }
+      // Check if apple hit ground
+      else if (apple.y >= -apple.r) {
+        apple.y = -apple.r; // Place on ground
+        apple.hasLanded = true;
+        apple.isFalling = false;
+      }
+    }
+  }
+}
+
+// Draw container
+function drawContainer() {
+  push();
+  translate(width / 2, height / 2 + 200);
+  
+  // Convert screen coordinates to canvas coordinates
+  let canvasX = container.x - width / 2;
+  let canvasY = container.y - (height / 2 + 200);
+  
+  // Draw container
+  fill(139, 69, 19); // Brown color
+  stroke(101, 67, 33);
+  strokeWeight(3);
+  rect(canvasX, canvasY, container.width, container.height, 10, 10, 0, 0);
+
   pop();
 }
