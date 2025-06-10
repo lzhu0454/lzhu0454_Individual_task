@@ -13,14 +13,25 @@ let dropQueue = []; // Queue of apples to drop
 let dropTimer = 0; // Timer for dropping apples sequentially
 let dropInterval = 60; // Frames between each apple drop (1 second at 60fps)
 
+// Responsive canvas properties
+let drawingProps = {
+  centerX: 0,
+  centerY: 0,
+  scale: 1,
+  cardWidth: 525,
+  cardHeight: 718,
+  cardX: 37,
+  cardY: 35
+};
+
 function preload() {
   // Preload audio file
   sound = loadSound("/red_velvet_dumb_dumb.mp3");
 }
 
 function setup() {
-  // Create 600x800 canvas
-  createCanvas(600, 800);
+  // Create responsive canvas that fits window
+  createCanvas(windowWidth, windowHeight);
   drawBackground();
 
   // Initialize tree branch line data
@@ -56,6 +67,9 @@ function setup() {
   // Initialize container position
   container.x = width / 2 - container.width / 2;
   container.y = height / 2 + 200 - container.height;
+  
+  // Calculate initial drawing properties
+  calculateImageDrawProps();
 }
 
 function styleButton(btn) {
@@ -81,24 +95,24 @@ function drawBackground() {
   background(199, 244, 255);
   noStroke();
   
-  // Draw blue card-like background
+  // Draw blue card-like background with responsive dimensions
   fill('#7E94BE');
-  rect(37, 35, 525, 718, 20);
+  rect(drawingProps.cardX, drawingProps.cardY, drawingProps.cardWidth, drawingProps.cardHeight, 20 * drawingProps.scale);
 
   // Translate origin and draw ground and tree base
   push();
-  translate(width / 2, height / 2 + 200);
+  translate(drawingProps.centerX, drawingProps.centerY + 200 * drawingProps.scale);
   
-  // Draw green ground
+  // Draw green ground with responsive scaling
   fill('#65C18D');
   stroke('#373A7D');
-  strokeWeight(2);
-  rect(-262, 0, 523, 86);
+  strokeWeight(2 * drawingProps.scale);
+  rect(-262 * drawingProps.scale, 0, 523 * drawingProps.scale, 86 * drawingProps.scale);
   
-  // Draw yellow tree base
+  // Draw yellow tree base with responsive scaling
   fill('#FFF28C');
   noStroke();
-  rect(-115, 0, 225, 70);
+  rect(-115 * drawingProps.scale, 0, 225 * drawingProps.scale, 70 * drawingProps.scale);
   pop();
 }
 
@@ -114,19 +128,21 @@ function drawApple() {
   dropTimer = 0;
 
   push();
-  // Translate origin to lower center of canvas
-  translate(width / 2, height / 2 + 200);
+  // Translate origin to lower center of canvas with responsive scaling
+  translate(drawingProps.centerX, drawingProps.centerY + 200 * drawingProps.scale);
   
-  // Generate apples on each line segment
+  // Generate apples on each line segment with responsive scaling
   for (let lineSegment of lines) {
-    drawCirclesOnLine(lineSegment.x1, lineSegment.y1, lineSegment.x2, lineSegment.y2, allCircles);
+    drawCirclesOnLine(lineSegment.x1 * drawingProps.scale, lineSegment.y1 * drawingProps.scale, 
+                     lineSegment.x2 * drawingProps.scale, lineSegment.y2 * drawingProps.scale, allCircles);
   }
 
-  // Draw tree branch lines
+  // Draw tree branch lines with responsive scaling
   stroke(234, 204, 70);
-  strokeWeight(2);
+  strokeWeight(2 * drawingProps.scale);
   for (let lineSegment of lines) {
-    line(lineSegment.x1, lineSegment.y1, lineSegment.x2, lineSegment.y2);
+    line(lineSegment.x1 * drawingProps.scale, lineSegment.y1 * drawingProps.scale, 
+         lineSegment.x2 * drawingProps.scale, lineSegment.y2 * drawingProps.scale);
   }
   pop();
 }
@@ -141,8 +157,8 @@ function drawCirclesOnLine(x1, y1, x2, y2, allCircles) {
 
   // Generate apples along the line
   while (pos < len) {
-    // Random radius for apple (15–40 pixels)
-    let r = random(15, 40);
+    // Random radius for apple (15–40 pixels) scaled responsively
+    let r = random(15, 40) * drawingProps.scale;
     // Compute apple center
     let cx = x1 + dx * (pos + r);
     let cy = y1 + dy * (pos + r);
@@ -285,7 +301,11 @@ function dropApples() {
   if (!gameStarted && allCircles.length > 0) {
     gameStarted = true;
     // Create randomized drop queue
-    dropQueue = [...Array(allCircles.length).keys()]; // [0, 1, 2, 3, ...]
+    dropQueue = []; // Step 1: Create empty array
+    // Fill array with indices from 0 to allCircles.length-1
+    for (let i = 0; i < allCircles.length; i++) {
+      dropQueue.push(i);
+    }
     // Shuffle the array randomly
     for (let i = dropQueue.length - 1; i > 0; i--) {
       let j = Math.floor(Math.random() * (i + 1));
@@ -323,7 +343,7 @@ function draw() {
   let t = map(lowEnergy, 0, 255, 0, 1); // Map energy to 0–1
 
   push();
-  translate(width / 2, height / 2 + 200);
+  translate(drawingProps.centerX, drawingProps.centerY + 200 * drawingProps.scale);
   noStroke();
   
   // Draw all visible apples with music-reactive color
@@ -347,11 +367,12 @@ function draw() {
     }
   }
 
-  // Draw tree branch lines
+  // Draw tree branch lines with responsive scaling
   stroke(234, 204, 70);
-  strokeWeight(2);
+  strokeWeight(2 * drawingProps.scale);
   for (let lineSegment of lines) {
-    line(lineSegment.x1, lineSegment.y1, lineSegment.x2, lineSegment.y2);
+    line(lineSegment.x1 * drawingProps.scale, lineSegment.y1 * drawingProps.scale, 
+         lineSegment.x2 * drawingProps.scale, lineSegment.y2 * drawingProps.scale);
   }
   pop();
   
@@ -380,8 +401,10 @@ function checkAppleCaught(apple, container) {
 
 // Let container position based on mouse
 function Container() {
-  // Keep container within canvas bounds
-  container.x = constrain(mouseX - container.width / 2, 37, 37 + 525 - container.width);
+  // Keep container within responsive card bounds
+  container.x = constrain(mouseX - container.width / 2, 
+                         drawingProps.cardX, 
+                         drawingProps.cardX + drawingProps.cardWidth - container.width);
 }
 
 // Let game logic for dropping apples and collision detection
@@ -437,3 +460,39 @@ function drawContainer() {
 
   pop();
 }
+
+// Handle window resize
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+  calculateImageDrawProps();
+}
+
+// Calculate proportional drawing properties for responsive canvas
+function calculateImageDrawProps() {
+  // Original design dimensions
+  let originalWidth = 600;
+  let originalHeight = 800;
+  
+  // Calculate scale to fit current window while maintaining aspect ratio
+  let scaleX = width / originalWidth;
+  let scaleY = height / originalHeight;
+  drawingProps.scale = min(scaleX, scaleY);
+  
+  // Calculate centered position
+  drawingProps.centerX = width / 2;
+  drawingProps.centerY = height / 2;
+  
+  // Scale card dimensions and position
+  drawingProps.cardWidth = 525 * drawingProps.scale;
+  drawingProps.cardHeight = 718 * drawingProps.scale;
+  drawingProps.cardX = (width - drawingProps.cardWidth) / 2;
+  drawingProps.cardY = (height - drawingProps.cardHeight) / 2;
+  
+  // Update container position proportionally
+  container.width = 120 * drawingProps.scale;
+  container.height = 60 * drawingProps.scale;
+  container.x = drawingProps.centerX - container.width / 2;
+  container.y = drawingProps.centerY + 200 * drawingProps.scale - container.height;
+}
+
+
