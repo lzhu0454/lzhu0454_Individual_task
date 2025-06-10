@@ -1,1 +1,12 @@
 # lzhu0454_Individual_task
+## Interactive Game - Catch the Apple 
+### 1. Interactive Instructions
+- After the user clicks the button to generate an apple tree, an interactive game prompt "Press SPACEBAR to start the Apple Catching Game!" will appear in the upper left corner, and a cardboard box will appear on the canvas. After the user presses the space bar, apples will fall randomly, and the cardboard box can be manipulated left and right with the mouse. The caught apples will disappear, and the uncaught apples will remain on the ground.
+
+### 2. Individual approach
+- My animation in this project is driven by **interaction**. 
+- My code mainly animates the apples and cartons on the tree. The apples fall randomly in response to the user's keyboard input, and the cartons move left and right with the mouse.image.
+- My **inspiration** came from a video of a small [Game of catching apples](https://www.youtube.com/watch?v=7NN5v2wSL4U) on YouTube, which I felt was very suitable for our original painting of the apple tree. I thought that this kind of interactivity could be introduced into the work, so that users would not only watch the image, but also actively participate in the image content: by controlling the basket to catch the apples falling from the tree. This not only retains the beauty of the original painting, but also **activates** the image through interaction and makes it move.
+- **Technical Explanation**
+  - When the space bar is pressed, apples will fall in a shuffled queue (dropQueue); The drop logic uses the isFalling and hasLanded flags to control the state; The player can move the basket (container) with the mouse to try to catch the apple; Use the checkAppleCaught() function to detect whether the apple has fallen into the basket.
+  - I refer to the usage of [textAlign()](https://p5js.org/reference/p5/textAlign/) to implement centered text prompts (such as instructions before the game starts).
